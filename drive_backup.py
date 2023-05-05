@@ -6,6 +6,7 @@
 import os
 from sys import argv
 import tempfile, zipfile
+from tabulate import tabulate
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from typing import Optional, Dict
@@ -36,12 +37,16 @@ def authorization() -> GoogleDrive:
 
 
 def create_folder(instance: GoogleDrive, FOLDER_NAME: Optional[str]="Backups") -> None:
-    '''This function create a `Backups` folder if that's not exists in the drive.'''
+    '''
+        This function creates `Backups` folder by default if that's not exists in the drive.
+        You can also create other folders that you want.
+    '''
 
     FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
 
     # creating a folder if `Backups` folder is not exists
     if not FOLDER_NAME in folder_details(instance):
+        print(f"Creating {FOLDER_NAME} folder...")
         up_folder = instance.CreateFile(
             {
                 "title": FOLDER_NAME,
@@ -49,6 +54,11 @@ def create_folder(instance: GoogleDrive, FOLDER_NAME: Optional[str]="Backups") -
             }
         )
         up_folder.Upload()
+        print(f"{FOLDER_NAME} folder created.")
+        print()
+    else:
+        print(f"{FOLDER_NAME} folder already exists.")
+        print()
 
 
 def folder_details(instance: GoogleDrive) -> Dict[str, str]:
@@ -56,7 +66,9 @@ def folder_details(instance: GoogleDrive) -> Dict[str, str]:
     
     FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
     folders = dict()
-    folder_list = instance.ListFile({"q": f"mimeType='{FOLDER_MIMETYPE}' and trashed=false"}).GetList()
+    folder_list = instance.ListFile({
+        "q": f"mimeType='{FOLDER_MIMETYPE}' and trashed=false"
+    }).GetList()
     
     for folder in folder_list:
         folders.update(
@@ -65,6 +77,22 @@ def folder_details(instance: GoogleDrive) -> Dict[str, str]:
             }
         )
     return folders
+
+
+def get_backups_fol_id(instance: GoogleDrive) -> str:
+    '''
+        Returns `id` of `Backups` folder.
+    '''
+
+    fol_details = folder_details(instance)
+
+    if "Backups" in fol_details:
+        return fol_details.get("Backups")
+    else:
+        print("Backups folder is not found.")
+        create_folder(drive)
+
+        return folder_details(drive).get("Backups")
 
 
 def upload_file(instance: GoogleDrive, filename: str, content_filename: str, folder_id: Optional[str]=None) -> None:
@@ -93,31 +121,21 @@ def upload_file(instance: GoogleDrive, filename: str, content_filename: str, fol
     print("File Uploaded.\n")
 
 
-if __name__ == "__main__":
-    
-    drive = authorization()
-    path = argv[1]
+def upload_zip(instance: GoogleDrive, path: str, folder_id: Optional[str]=None) -> None:
+    '''
+        creating temporary buffer to store zip file 
+        NOTE: created temporary file will be deleted after this context manager
 
-    # getting id of `Backups` folder
-    fol_details = folder_details(drive)
-    folder_id = fol_details.get("Backups") if "Backups" in fol_details else None
+        :param path: expected path should be `folder path` not `file path`
+    '''
 
-    # checking `Backups` exists or not
-    if folder_id is None:
-        print("Backups folder is not found.\nCreating Backups folder...")
-        create_folder(drive)
-        print("Backups folder created.\n")
-        folder_id = folder_details(drive).get("Backups")
-
-    # creating temporary buffer to store zip file 
-    # NOTE: created temporary file will be deleted after this context manager
     with tempfile.NamedTemporaryFile(suffix=".zip") as temp_zip:
 
         # archiving the files that is in the given path
         with zipfile.ZipFile(temp_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
 
             # iterating over each and every file in the given path
-            for cur_path, dirs, files in list(os.walk(path)):
+            for cur_path, _, files in list(os.walk(path)):
                 for file in files:
                     zip_file.write(
                         filename=os.path.join(cur_path, file),
@@ -126,8 +144,53 @@ if __name__ == "__main__":
 
         # Uploading a file
         upload_file(
-            instance=drive, 
+            instance=instance, 
             filename=f"{os.path.split(path)[-1]}.zip", 
             content_filename=temp_zip.name,
             folder_id=folder_id
         )
+
+
+def save_to_local(instance: GoogleDrive) -> None:
+    '''Saves the files to local directory from the `Backups` (from My Drive) folder.'''
+
+    fol_details = folder_details(instance)
+
+    if "Backups" in fol_details:
+        folder_id = fol_details.get("Backups")
+
+        files = instance.ListFile({
+            "q": f"'{folder_id}' in parents and trashed=false"
+        }).GetList()
+
+        files_list = list()
+        files_dict = dict()
+        for index, file in enumerate(files, start=1):
+            files_list.append([index, file.get("title")])
+            files_dict.update({index: file.get("title")})
+
+        print(tabulate(files_list, headers=["SI.NO", "FILE NAME"], tablefmt="simple_grid"))
+        print()
+        file_no = int(input("Enter the number corresponding to the filename which you want to save: "))
+        print()
+        print(f"Writing {files_dict.get(file_no)}...")
+    else:
+        raise Exception("Backups folder not found.")
+    
+
+if __name__ == "__main__":
+    
+    drive = authorization()
+    path = argv[1]
+    
+    folder_id = get_backups_fol_id(drive)
+
+    '''# uploading a zip file
+    upload_zip(
+        instance=drive,
+        path=path,
+        folder_id=folder_id
+    )'''
+
+    # downloading
+    save_to_local(drive)
