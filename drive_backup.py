@@ -4,7 +4,6 @@
 # python drive_backup.py "Folder Location"
 
 import os
-from sys import argv
 import tempfile, zipfile
 from tabulate import tabulate
 from pydrive.auth import GoogleAuth
@@ -90,16 +89,20 @@ def get_backups_fol_id(instance: GoogleDrive) -> str:
         return fol_details.get("Backups")
     else:
         print("Backups folder is not found.")
-        create_folder(drive)
+        create_folder(instance)
 
-        return folder_details(drive).get("Backups")
+        return folder_details(instance).get("Backups")
 
 
-def upload_file(instance: GoogleDrive, filename: str, content_filename: str, folder_id: Optional[str]=None) -> None:
+def upload_file(instance: GoogleDrive, content_filename: str, filename: Optional[str]=None, folder_id: Optional[str]=None) -> None:
     f'''
     Uploads file to the google drive.
-    :param folder_id: expects `Backups` folder's ID. If nothing specifed, then it will upload to the `root(My Drive)` folder
+    :param content_filename: it can be a path of the file that contains contents.
+    :param folder_id: expects `Backups` folder's ID. If nothing specifed, then it will upload to the `root(My Drive)` folder.
     '''
+
+    if filename is None:
+        filename = os.path.split(content_filename)[-1]
 
     if folder_id:
         file_metadata = {
@@ -121,10 +124,11 @@ def upload_file(instance: GoogleDrive, filename: str, content_filename: str, fol
     print("File Uploaded.\n")
 
 
-def upload_zip(instance: GoogleDrive, path: str, folder_id: Optional[str]=None) -> None:
+def upload_folder(instance: GoogleDrive, path: str, folder_id: Optional[str]=None) -> None:
     '''
         creating temporary buffer to store zip file 
-        NOTE: created temporary file will be deleted after this context manager
+        NOTE: it will upload the folder by converting it to the `zip` archive and 
+        created temporary file will be deleted after this context manager
 
         :param path: expected path should be `folder path` not `file path`
     '''
@@ -151,46 +155,31 @@ def upload_zip(instance: GoogleDrive, path: str, folder_id: Optional[str]=None) 
         )
 
 
-def save_to_local(instance: GoogleDrive) -> None:
+def save_to_local(instance: GoogleDrive, folder_name: Optional[str]="Backups") -> None:
     '''Saves the files to local directory from the `Backups` (from My Drive) folder.'''
 
     fol_details = folder_details(instance)
 
-    if "Backups" in fol_details:
-        folder_id = fol_details.get("Backups")
+    if folder_name in fol_details:
+        folder_id = fol_details.get(folder_name)
 
         files = instance.ListFile({
             "q": f"'{folder_id}' in parents and trashed=false"
         }).GetList()
 
-        files_list = list()
-        files_dict = dict()
+        files_list, files_dict = list(), dict()
         for index, file in enumerate(files, start=1):
             files_list.append([index, file.get("title")])
             files_dict.update({index: file.get("title")})
 
-        print(tabulate(files_list, headers=["SI.NO", "FILE NAME"], tablefmt="simple_grid"))
-        print()
-        file_no = int(input("Enter the number corresponding to the filename which you want to save: "))
-        print()
-        print(f"Writing {files_dict.get(file_no)}...")
+        print(tabulate(files_list, headers=["SI.NO", "FILE NAME"], tablefmt="simple_grid"), end="\n\n")
+        
+        file_no = int(input("Enter the number corresponding to the filename which you want to save: ")); print()
+        filename = files_dict.get(file_no)
+        if filename:
+            print(f"Writing {filename}...")
+        else:
+            raise ValueError("Invalid number selected")
     else:
-        raise Exception("Backups folder not found.")
-    
+        raise Exception(f"{folder_name} folder not found.")
 
-if __name__ == "__main__":
-    
-    drive = authorization()
-    path = argv[1]
-    
-    folder_id = get_backups_fol_id(drive)
-
-    '''# uploading a zip file
-    upload_zip(
-        instance=drive,
-        path=path,
-        folder_id=folder_id
-    )'''
-
-    # downloading
-    save_to_local(drive)
