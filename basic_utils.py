@@ -6,7 +6,7 @@
 
 # this script will helpful to upload/download files from Drive's `Backups` folder only.
 
-import drive_backup as bkup
+import GBackupPy as bkup
 from typing import Optional
 
 def upload(instance: bkup.authorization, is_file: bool, path: str) -> None:
