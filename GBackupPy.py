@@ -12,6 +12,7 @@ from typing import Optional, Dict
 
 # constants
 FOLDER_MIMETYPE = "application/vnd.google-apps.folder"
+BACKUPS_FOLDER_NAME = "Backups"
 
 def authorization() -> GoogleDrive:
     '''
@@ -38,7 +39,7 @@ def authorization() -> GoogleDrive:
     return GoogleDrive(gl_auth)
 
 
-def create_folder(instance: GoogleDrive, FOLDER_NAME: Optional[str]="Backups") -> None:
+def create_folder(instance: GoogleDrive, FOLDER_NAME: Optional[str]=BACKUPS_FOLDER_NAME) -> None:
     '''
         This function creates `Backups` folder by default if that's not exists in the drive.
         You can also create other folders that you want.
@@ -64,26 +65,19 @@ def create_folder(instance: GoogleDrive, FOLDER_NAME: Optional[str]="Backups") -
 def folder_details(instance: GoogleDrive) -> Dict[str, str]:
     '''Returns all the `folder names` with their `folder ID` that is in the drive.'''
     
-    folders = dict()
-    folder_list = instance.ListFile({
+    folders_in_drive = instance.ListFile({
         "q": f"mimeType='{FOLDER_MIMETYPE}' and trashed=false"
     }).GetList()
     
-    for folder in folder_list:
-        folders.update(
-            {
-                folder.get("title"): folder.get("id")
-            }
-        )
-    return folders
+    return {folder.get("title"): folder.get("id") for folder in folders_in_drive}
 
 
-def get_fol_id(instance: GoogleDrive, folder_name: Optional[str]="Backups") -> str:
+def get_fol_id(instance: GoogleDrive, folder_name: Optional[str]=BACKUPS_FOLDER_NAME) -> str:
     '''Returns `id` of `Backups` folder by default.'''
 
     fol_details = folder_details(instance)
 
-    if folder_name in fol_details:
+    if fol_details.get(folder_name):
         return fol_details.get(folder_name)
     else:
         raise ValueError(f"'{folder_name}' folder is not found.")
@@ -93,19 +87,12 @@ def file_details(instance: GoogleDrive, folder_name: str) -> Dict[str, str]:
     '''Returns all the `file names` with their `file ID` that is in the drive.'''
     
     folder_id = get_fol_id(instance, folder_name=folder_name)
-    files = dict()
 
-    file_list = instance.ListFile({
+    files_in_list = instance.ListFile({
         "q": f"'{folder_id}' in parents and mimeType != '{FOLDER_MIMETYPE}' and trashed=false"
     }).GetList()
 
-    for file in file_list:
-        files.update(
-            {
-                file.get("title"): file.get("id")
-            }
-        )
-    return files
+    return {file.get("title"): file.get("id") for file in files_in_list}
 
 
 def upload_file(instance: GoogleDrive, path: str, filename: Optional[str]=None, folder_id: Optional[str]=None) -> None:
@@ -186,7 +173,7 @@ def upload_folder(instance: GoogleDrive, path: str, folder_id: Optional[str]=Non
         print(f"'{path}' not exists.")
 
 
-def save_to_local(instance: GoogleDrive, filename: str, path: Optional[str]=".", folder_name: Optional[str]="Backups") -> None:
+def save_to_local(instance: GoogleDrive, filename: str, path: Optional[str]=".", folder_name: Optional[str]=BACKUPS_FOLDER_NAME) -> None:
     '''
         Saves the files to local directory from the `Backups` (from My Drive) folder by default.
         You can also choose other folder name as well.
