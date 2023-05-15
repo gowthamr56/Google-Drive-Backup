@@ -14,9 +14,18 @@ def upload(instance: bkup.authorization, is_file: bool, path: str) -> None:
         folder_id = bkup.get_fol_id(instance)
 
         if is_file:
-            bkup.upload_file(instance, path, folder_id=folder_id)
+            # checking the file (that is going to upload) is already exist or not 
+            fl_details = bkup.file_details(instance)
+            
+            if path in fl_details:
+                bkup.trash_file(instance, file_name=path)
+                bkup.upload_file(instance, path, folder_id=folder_id)
+            else: 
+                bkup.upload_file(instance, path, folder_id=folder_id)
+
         else:
             bkup.upload_folder(instance, path, folder_id)
+
     except ValueError as ve:
         print(f"{ve} Just go to 'drive.google.com' and create a folder named 'Backups'.")
 
