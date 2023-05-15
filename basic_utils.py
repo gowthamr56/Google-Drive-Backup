@@ -31,9 +31,11 @@ if __name__ == "__main__":
     # upload(instance=drive, is_file=True, path="test.txt")
 
     # listing files
-    # print(list(bkup.file_details(instance=drive, folder_name="Backups").keys()))
+    # details = bkup.file_details(instance=drive)
 
     # downloading...
     # bkup.save_to_local(instance=drive, filename="enter filename")  # saves in current directory
     # bkup.save_to_local(instance=drive, filename="enter filename", path="/path/to/save")
     
+    # trashing...
+    # bkup.trash_file(drive, "test.txt")

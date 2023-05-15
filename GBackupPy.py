@@ -83,8 +83,11 @@ def get_fol_id(instance: GoogleDrive, folder_name: Optional[str]=BACKUPS_FOLDER_
         raise ValueError(f"'{folder_name}' folder is not found.")
     
 
-def file_details(instance: GoogleDrive, folder_name: str) -> Dict[str, str]:
-    '''Returns all the `file names` with their `file ID` that is in the drive.'''
+def file_details(instance: GoogleDrive, folder_name: Optional[str]=BACKUPS_FOLDER_NAME) -> Dict[str, str]:
+    '''
+    Returns all the `file names` with their `file ID` which is in the `Backups` folder by default.
+    You can also specify other folder name.
+    '''
     
     folder_id = get_fol_id(instance, folder_name=folder_name)
 
@@ -195,4 +198,22 @@ def save_to_local(instance: GoogleDrive, filename: str, path: Optional[str]=".",
         print(f"'{filename}' has written.", end="\n\n")
     else:
         raise Exception(f"{filename} file not found.")
+
+
+def trash_file(instance: GoogleDrive, file_name: str, folder_name: Optional[str]=BACKUPS_FOLDER_NAME) -> None:
+    '''Moves file to `Trash` folder'''
+
+    fl_details = file_details(instance, folder_name)
+     
+    if file_name in fl_details:
+        file_id = fl_details.get(file_name) 
+    else:
+        raise Exception(f"{file_name} file not found.")
+
+    file = instance.CreateFile(
+        {'id': file_id}
+    )
+    print(f"Trashing {file_name}...")
+    file.Trash()
+    print(f"{file_name} trashed.", end="\n\n")
 
